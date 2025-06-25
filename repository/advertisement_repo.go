@@ -41,7 +41,7 @@ func (r *AdRepo) GetByID(id int64) (*domain.Advertisement, error) {
 
 func (r *AdRepo) Search(keyword string, maxPrice int64) ([]*domain.Advertisement, error) {
 	query := `SELECT id,user_id,title,description,price,photos_urls,address,archived,created_at,updated_at
-              FROM advertisements WHERE 1=1 AND archived='false'`
+              FROM advertisements WHERE archived='false'`
 	args := []interface{}{}
 	i := 1
 

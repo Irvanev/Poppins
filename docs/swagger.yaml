@@ -1,0 +1,329 @@
+basePath: /
+definitions:
+  domain.Advertisement:
+    properties:
+      address:
+        type: string
+      archived:
+        type: boolean
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      photos_urls:
+        items:
+          type: string
+        type: array
+      price:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  domain.User:
+    properties:
+      created_at:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      phone:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Простое REST API для работы с объявлениями и пользователями.
+  title: Monolith Ads API
+  version: "1.0"
+paths:
+  /ads:
+    get:
+      description: Ищет объявления по ключевому слову в заголовке и/или по максимальной
+        цене.
+      parameters:
+      - description: Ключевое слово для поиска
+        in: query
+        name: search
+        type: string
+      - description: Максимальная цена
+        in: query
+        name: max_price
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Advertisement'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Поиск объявлений
+      tags:
+      - ads
+    post:
+      consumes:
+      - multipart/form-data
+      description: Создаёт новое объявление пользователя и загружает файлы фото в
+        объектное хранилище.
+      parameters:
+      - description: ID пользователя
+        in: formData
+        name: user_id
+        required: true
+        type: integer
+      - description: Заголовок объявления
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Описание объявления
+        in: formData
+        name: description
+        required: true
+        type: string
+      - description: Цена объявления
+        in: formData
+        name: price
+        required: true
+        type: integer
+      - description: Адрес размещения объявления
+        in: formData
+        name: address
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Файлы фотографий объявления
+        in: formData
+        items:
+          type: file
+        name: photos
+        required: true
+        type: array
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Advertisement'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать объявление
+      tags:
+      - ads
+  /ads/{id}:
+    delete:
+      description: Удаляет объявление из БД по его идентификатору.
+      parameters:
+      - description: ID объявления
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить объявление
+      tags:
+      - ads
+    get:
+      description: Возвращает детали объявления по переданному идентификатору.
+      parameters:
+      - description: ID объявления
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Advertisement'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить объявление
+      tags:
+      - ads
+    put:
+      consumes:
+      - application/json
+      description: Обновляет поля объявления по его ID.
+      parameters:
+      - description: ID объявления
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Объект объявления
+        in: body
+        name: ad
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Advertisement'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Advertisement'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить объявление
+      tags:
+      - ads
+  /ads/{id}/archive:
+    post:
+      description: Помечает объявление как архивное (archived = true).
+      parameters:
+      - description: ID объявления
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Архивировать объявление
+      tags:
+      - ads
+  /users:
+    post:
+      consumes:
+      - application/json
+      description: Принимает JSON с данными пользователя и сохраняет его в БД.
+      parameters:
+      - description: Данные пользователя
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/domain.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать пользователя
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      description: Удаляет запись пользователя из БД по его идентификатору.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.User'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить пользователя
+      tags:
+      - users
+    get:
+      description: Возвращает пользователя из БД по переданному в пути идентификатору.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.User'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить пользователя
+      tags:
+      - users
+swagger: "2.0"

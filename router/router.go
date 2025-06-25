@@ -17,7 +17,6 @@ func NewRouter(uh *handlers.UserHandler, ah *handlers.AdHandler) *mux.Router {
 	r.HandleFunc("/ads", ah.Create).Methods("POST")
 	r.HandleFunc("/ads/{id}", ah.Get).Methods("GET")
 	r.HandleFunc("/ads", ah.Search).Methods("GET")
-	r.HandleFunc("/ads", ah.List).Methods("GET")
 	r.HandleFunc("/ads/{id}", ah.Update).Methods("PUT")
 	r.HandleFunc("/ads/{id}", ah.Delete).Methods("DELETE")
 	r.HandleFunc("/ads/{id}/archive", ah.Archive).Methods("PATCH")

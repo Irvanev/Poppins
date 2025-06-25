@@ -16,7 +16,16 @@ import (
 	"poppins/handlers"
 	"poppins/repository"
 	"poppins/router"
+
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "poppins/docs"
 )
+
+// @title           Monolith Ads API
+// @version         1.0
+// @description     Простое REST API для работы с объявлениями и пользователями.
+// @host      localhost:8080
+// @BasePath  /
 
 func main() {
 	if err := godotenv.Load(); err != nil {
@@ -61,6 +70,7 @@ func main() {
 	ah := handlers.NewAdHandler(adRepo, minioClient, cfg.MinIOBucket)
 
 	r := router.NewRouter(uh, ah)
+	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 	log.Println("Server started on port", cfg.ServerPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.ServerPort, r))
 }

@@ -18,6 +18,17 @@ func NewUserHandler(repo *repository.UserRepo) *UserHandler {
 	return &UserHandler{Repo: repo}
 }
 
+// Create создаёт нового пользователя.
+// @Summary      Создать пользователя
+// @Description  Принимает JSON с данными пользователя и сохраняет его в БД.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        user  body      domain.User  true  "Данные пользователя"
+// @Success      201   {object}  domain.User
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /users [post]
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var u domain.User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
@@ -32,6 +43,15 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
+// Get возвращает пользователя по ID.
+// @Summary      Получить пользователя
+// @Description  Возвращает пользователя из БД по переданному в пути идентификатору.
+// @Tags         users
+// @Produce      json
+// @Param        id   path      int  true  "ID пользователя"
+// @Success      200  {object}  domain.User
+// @Failure      404  {object}  map[string]string
+// @Router       /users/{id} [get]
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	u, err := h.Repo.GetByID(id)
@@ -42,6 +62,15 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
+// Delete удаляет пользователя по ID.
+// @Summary      Удалить пользователя
+// @Description  Удаляет запись пользователя из БД по его идентификатору.
+// @Tags         users
+// @Produce      json
+// @Param        id   path      int  true  "ID пользователя"
+// @Success      200  {object}  domain.User
+// @Failure      404  {object}  map[string]string
+// @Router       /users/{id} [delete]
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	u, err := h.Repo.Delete(id)
