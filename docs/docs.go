@@ -153,7 +153,7 @@ const docTemplate = `{
         },
         "/ads/{id}": {
             "get": {
-                "description": "Возвращает детали объявления по переданному идентификатору.",
+                "description": "Возвращает детали объявления по переданному идентификатору и telegram_id.",
                 "tags": [
                     "ads"
                 ],
@@ -165,6 +165,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Telegram ID пользователя",
+                        "name": "telegram_id",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -172,6 +179,15 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/domain.Advertisement"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "404": {
@@ -360,7 +376,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/{id}": {
+        "/users/{telegramId}": {
             "get": {
                 "description": "Возвращает пользователя из БД по переданному в пути идентификатору.",
                 "produces": [
@@ -374,7 +390,7 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "description": "ID пользователя",
-                        "name": "id",
+                        "name": "telegramId",
                         "in": "path",
                         "required": true
                     }
@@ -409,8 +425,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "ID пользователя",
-                        "name": "id",
+                        "description": "TelegramID пользователя",
+                        "name": "telegramId",
                         "in": "path",
                         "required": true
                     }
@@ -455,12 +471,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "photos_urls": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                    "type": "string"
                 },
                 "price": {
+                    "type": "integer"
+                },
+                "telegram_id": {
                     "type": "integer"
                 },
                 "title": {
@@ -477,20 +493,26 @@ const docTemplate = `{
         "domain.User": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
+                "ads_count": {
+                    "type": "integer"
                 },
-                "first_name": {
+                "created_at": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
+                "name": {
+                    "type": "string"
+                },
                 "phone": {
                     "type": "string"
                 },
-                "username": {
+                "preferred_contact": {
                     "type": "string"
+                },
+                "telegram_id": {
+                    "type": "integer"
                 }
             }
         }

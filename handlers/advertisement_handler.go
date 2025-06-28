@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"poppins/domain"
@@ -40,51 +43,69 @@ func NewAdHandler(repo *repository.AdRepo, mc *minio.Client, bucket string) *AdH
 // @Failure      400          {object}  map[string]string
 // @Failure      500          {object}  map[string]string
 // @Router       /ads [post]
+// handlers/ad.go
 func (h *AdHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	// Ограничим размер формы до 20 МБ
 	if err := r.ParseMultipartForm(20 << 20); err != nil {
 		http.Error(w, "cannot parse form: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	userID, _ := strconv.ParseInt(r.FormValue("user_id"), 10, 64)
+
+	// Читаем telegram_id
+	telegramID, err := strconv.ParseInt(r.FormValue("telegram_id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid telegram_id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	title := r.FormValue("title")
 	description := r.FormValue("description")
-	price, _ := strconv.ParseInt(r.FormValue("price"), 10, 64)
+	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
+	if err != nil {
+		http.Error(w, "invalid price: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	address := r.FormValue("address")
 
-	var photoURLs []string
-	files := r.MultipartForm.File["photos"]
-	ctx := context.Background()
-	for _, fh := range files {
-		file, err := fh.Open()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-
-		objectName := fmt.Sprintf("ads/%d_%d%s", userID, time.Now().UnixNano(), filepath.Ext(fh.Filename))
-		info, err := h.MinioClient.PutObject(ctx, h.Bucket, objectName, file, fh.Size, minio.PutObjectOptions{
-			ContentType: fh.Header.Get("Content-Type"),
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		_ = info
-		photoURLs = append(photoURLs, fmt.Sprintf("/%s/%s", h.Bucket, objectName))
+	// Обрабатываем одно фото
+	file, fh, err := r.FormFile("photo")
+	if err != nil {
+		http.Error(w, "photo is required: "+err.Error(), http.StatusBadRequest)
+		return
 	}
+	defer file.Close()
 
+	objectName := fmt.Sprintf("ads/ads/%d_%d%s",
+		telegramID, time.Now().UnixNano(), filepath.Ext(fh.Filename),
+	)
+	_, err = h.MinioClient.PutObject(
+		context.Background(),
+		h.Bucket,
+		objectName,
+		file,
+		fh.Size,
+		minio.PutObjectOptions{ContentType: fh.Header.Get("Content-Type")},
+	)
+	if err != nil {
+		http.Error(w, "upload error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	photoURL := fmt.Sprintf("/photos/%s", objectName)
+
+	// Собираем объявление
 	ad := &domain.Advertisement{
-		UserID:      userID,
+		TelegramID:  telegramID,
 		Title:       title,
 		Description: description,
-		Price:       price,
-		PhotosUrls:  photoURLs,
+		Price:       int64(price),
+		PhotosUrls:  photoURL,
 		Address:     address,
 	}
+
 	if err := h.Repo.Create(ad); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "cannot save ad: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -92,23 +113,90 @@ func (h *AdHandler) Create(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ad)
 }
 
-// Get возвращает объявление по его ID.
+// Get возвращает объявление по его ID, но только если оно
+// принадлежит пользователю с данным telegram_id.
 // @Summary      Получить объявление
-// @Description  Возвращает детали объявления по переданному идентификатору.
+// @Description  Возвращает детали объявления по переданному идентификатору и telegram_id.
 // @Tags         ads
-// @Param        id   path      int  true  "ID объявления"
+// @Param        id            path      int  true  "ID объявления"
+// @Param        telegram_id   query     int  true  "Telegram ID пользователя"
 // @Success      200  {object}  domain.Advertisement
+// @Failure      400  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
 // @Router       /ads/{id} [get]
 func (h *AdHandler) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
-	ad, err := h.Repo.GetByID(id)
+
+	// 1) Парсим ID объявления из пути
+	idStr := mux.Vars(r)["id"]
+	adID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, "invalid ad id: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(ad)
+
+	// 2) Парсим telegram_id из query-параметра
+	tgStr := r.URL.Query().Get("telegram_id")
+	telegramID, err := strconv.ParseInt(tgStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid telegram_id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// 3) Запрашиваем объявление с проверкой принадлежности
+	ad, err := h.Repo.GetByIDAndTelegram(adID, telegramID)
+	if err != nil {
+		// Здесь проверяем, что это именно “не найдено”, а не внутренняя ошибка
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "ad not found or access denied", http.StatusNotFound)
+		} else {
+			log.Printf("GetByIDAndTelegram error: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// 4) Отдаём JSON
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(ad); err != nil {
+		log.Printf("JSON encode error: %v", err)
+		// Обратите внимание: здесь заголовки уже ушли, но хотя бы залогируем
+	}
+}
+
+// ListByTelegram возвращает все активные объявления пользователя по его telegram_id.
+// @Summary      Список объявлений пользователя
+// @Description  Возвращает массив объявлений, принадлежащих пользователю с переданным telegram_id.
+// @Tags         ads
+// @Param        telegram_id   query     int  true  "Telegram ID пользователя"
+// @Success      200  {array}   domain.Advertisement
+// @Failure      400  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /ads [get]
+func (h *AdHandler) ListByTelegram(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Парсим telegram_id из query-параметра
+	telegramIDStr := r.URL.Query().Get("telegram_id")
+	telegramID, err := strconv.ParseInt(telegramIDStr, 10, 64)
+	if err != nil || telegramIDStr == "" {
+		http.Error(w, "invalid or missing telegram_id", http.StatusBadRequest)
+		return
+	}
+
+	// Получаем список объявлений из репозитория
+	ads, err := h.Repo.GetByTelegramID(telegramID)
+	if err != nil {
+		http.Error(w, "cannot fetch ads: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Отдаём пустой массив, если объявлений нет
+	if ads == nil {
+		ads = []*domain.Advertisement{}
+	}
+
+	json.NewEncoder(w).Encode(ads)
 }
 
 // Search обрабатывает поиск объявлений.

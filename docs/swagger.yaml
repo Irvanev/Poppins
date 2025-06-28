@@ -13,10 +13,10 @@ definitions:
       id:
         type: integer
       photos_urls:
-        items:
-          type: string
-        type: array
+        type: string
       price:
+        type: integer
+      telegram_id:
         type: integer
       title:
         type: string
@@ -27,16 +27,20 @@ definitions:
     type: object
   domain.User:
     properties:
+      ads_count:
+        type: integer
       created_at:
-        type: string
-      first_name:
         type: string
       id:
         type: integer
+      name:
+        type: string
       phone:
         type: string
-      username:
+      preferred_contact:
         type: string
+      telegram_id:
+        type: integer
     type: object
 host: localhost:8080
 info:
@@ -163,11 +167,16 @@ paths:
       tags:
       - ads
     get:
-      description: Возвращает детали объявления по переданному идентификатору.
+      description: Возвращает детали объявления по переданному идентификатору и telegram_id.
       parameters:
       - description: ID объявления
         in: path
         name: id
+        required: true
+        type: integer
+      - description: Telegram ID пользователя
+        in: query
+        name: telegram_id
         required: true
         type: integer
       responses:
@@ -175,6 +184,12 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/domain.Advertisement'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "404":
           description: Not Found
           schema:
@@ -277,13 +292,13 @@ paths:
       summary: Создать пользователя
       tags:
       - users
-  /users/{id}:
+  /users/{telegramId}:
     delete:
       description: Удаляет запись пользователя из БД по его идентификатору.
       parameters:
-      - description: ID пользователя
+      - description: TelegramID пользователя
         in: path
-        name: id
+        name: telegramId
         required: true
         type: integer
       produces:
@@ -307,7 +322,7 @@ paths:
       parameters:
       - description: ID пользователя
         in: path
-        name: id
+        name: telegramId
         required: true
         type: integer
       produces:

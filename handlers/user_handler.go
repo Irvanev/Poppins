@@ -30,6 +30,7 @@ func NewUserHandler(repo *repository.UserRepo) *UserHandler {
 // @Failure      500   {object}  map[string]string
 // @Router       /users [post]
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var u domain.User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -43,17 +44,18 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
-// Get возвращает пользователя по ID.
+// Get возвращает пользователя по TelegramID.
 // @Summary      Получить пользователя
 // @Description  Возвращает пользователя из БД по переданному в пути идентификатору.
 // @Tags         users
 // @Produce      json
-// @Param        id   path      int  true  "ID пользователя"
+// @Param        telegramId   path      int  true  "ID пользователя"
 // @Success      200  {object}  domain.User
 // @Failure      404  {object}  map[string]string
-// @Router       /users/{id} [get]
+// @Router       /users/{telegramId} [get]
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	w.Header().Set("Content-Type", "application/json")
+	id, _ := strconv.ParseInt(mux.Vars(r)["telegramId"], 10, 64)
 	u, err := h.Repo.GetByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -62,17 +64,18 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
-// Delete удаляет пользователя по ID.
+// Delete удаляет пользователя по TelegramID.
 // @Summary      Удалить пользователя
 // @Description  Удаляет запись пользователя из БД по его идентификатору.
 // @Tags         users
 // @Produce      json
-// @Param        id   path      int  true  "ID пользователя"
+// @Param        telegramId   path      int  true  "TelegramID пользователя"
 // @Success      200  {object}  domain.User
 // @Failure      404  {object}  map[string]string
-// @Router       /users/{id} [delete]
+// @Router       /users/{telegramId} [delete]
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	w.Header().Set("Content-Type", "application/json")
+	id, _ := strconv.ParseInt(mux.Vars(r)["telegramId"], 10, 64)
 	u, err := h.Repo.Delete(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
