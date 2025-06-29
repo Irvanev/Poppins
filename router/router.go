@@ -15,6 +15,10 @@ func NewRouter(uh *handlers.UserHandler, ah *handlers.AdHandler) *mux.Router {
 	r.HandleFunc("/users/{telegramId}", uh.Get).Methods("GET")
 	r.HandleFunc("/users/{telegramId}", uh.Delete).Methods("DELETE")
 
+	r.HandleFunc("/users/{telegramId}/name", uh.UpdateName).Methods("PATCH")
+	r.HandleFunc("/users/{telegramId}/phone", uh.UpdatePhone).Methods("PATCH")
+	r.HandleFunc("/users/{telegramId}/contact", uh.UpdateContact).Methods("PATCH")
+
 	// Список объявлений конкретного пользователя
 	r.HandleFunc("/users/{telegramId}/ads", ah.ListByTelegram).Methods("GET")
 

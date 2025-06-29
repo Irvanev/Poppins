@@ -20,7 +20,7 @@ func (r *UserRepo) Create(u *domain.User) error {
 	).Scan(&u.ID, &u.CreatedAt)
 }
 
-func (r *UserRepo) GetByID(telegramId int64) (*domain.User, error) {
+func (r *UserRepo) GetByID(telegramId string) (*domain.User, error) {
 	u := &domain.User{}
 	err := r.DB.QueryRow(`
         SELECT
@@ -53,11 +53,47 @@ func (r *UserRepo) GetByID(telegramId int64) (*domain.User, error) {
 	return u, nil
 }
 
-func (r *UserRepo) Delete(telegramId int64) (*domain.User, error) {
+func (r *UserRepo) Delete(telegramId string) (*domain.User, error) {
 	u, err := r.GetByID(telegramId)
 	if err != nil {
 		return nil, err
 	}
 	_, err = r.DB.Exec(`DELETE FROM users WHERE telegram_id=$1`, telegramId)
 	return u, err
+}
+
+// UpdateName обновляет только поле name
+func (r *UserRepo) UpdateName(telegramId string, newName string) (*domain.User, error) {
+	_, err := r.DB.Exec(
+		`UPDATE users SET name = $1 WHERE telegram_id = $2`,
+		newName, telegramId,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.GetByID(telegramId)
+}
+
+// UpdatePhone обновляет только поле phone
+func (r *UserRepo) UpdatePhone(telegramId string, newPhone string) (*domain.User, error) {
+	_, err := r.DB.Exec(
+		`UPDATE users SET phone = $1 WHERE telegram_id = $2`,
+		newPhone, telegramId,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.GetByID(telegramId)
+}
+
+// UpdatePreferredContact обновляет только поле preferred_contact
+func (r *UserRepo) UpdatePreferredContact(telegramId string, newContact string) (*domain.User, error) {
+	_, err := r.DB.Exec(
+		`UPDATE users SET preferred_contact = $1 WHERE telegram_id = $2`,
+		newContact, telegramId,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.GetByID(telegramId)
 }

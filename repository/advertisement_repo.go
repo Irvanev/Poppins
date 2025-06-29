@@ -48,13 +48,15 @@ func (r *AdRepo) Create(ad *domain.Advertisement) error {
 }
 
 // GetByTelegramID возвращает список объявлений для пользователя с данным telegram_id.
-func (r *AdRepo) GetByTelegramID(telegramID int64) ([]*domain.Advertisement, error) {
+func (r *AdRepo) GetByTelegramID(telegramID string) ([]*domain.Advertisement, error) {
 	// 1) джоин с таблицей users по telegram_id
 	rows, err := r.DB.Query(
 		`SELECT 
             a.id,
             a.user_id,
             u.telegram_id,
+            u.name,
+            u.phone,
             a.title,
             a.description,
             a.price,
@@ -82,6 +84,8 @@ func (r *AdRepo) GetByTelegramID(telegramID int64) ([]*domain.Advertisement, err
 			&ad.ID,
 			&ad.UserID,
 			&ad.TelegramID,
+			&ad.UserName,
+			&ad.UserPhone,
 			&ad.Title,
 			&ad.Description,
 			&ad.Price,
@@ -101,13 +105,15 @@ func (r *AdRepo) GetByTelegramID(telegramID int64) ([]*domain.Advertisement, err
 	return ads, nil
 }
 
-func (r *AdRepo) GetByIDAndTelegram(adID, telegramID int64) (*domain.Advertisement, error) {
+func (r *AdRepo) GetByIDAndTelegram(adID int64, telegramID string) (*domain.Advertisement, error) {
 	ad := &domain.Advertisement{}
 	err := r.DB.QueryRow(
 		`SELECT 
             a.id,
             a.user_id,
             u.telegram_id,
+            u.name,
+            u.phone,
             a.title,
             a.description,
             a.price,
@@ -126,6 +132,8 @@ func (r *AdRepo) GetByIDAndTelegram(adID, telegramID int64) (*domain.Advertiseme
 		&ad.ID,
 		&ad.UserID,
 		&ad.TelegramID,
+		&ad.UserName,
+		&ad.UserPhone,
 		&ad.Title,
 		&ad.Description,
 		&ad.Price,
@@ -142,38 +150,78 @@ func (r *AdRepo) GetByIDAndTelegram(adID, telegramID int64) (*domain.Advertiseme
 }
 
 func (r *AdRepo) Search(keyword string, maxPrice int64) ([]*domain.Advertisement, error) {
-	query := `SELECT id,user_id,title,description,price,photos_urls,address,archived,created_at,updated_at
-              FROM advertisements WHERE archived='false'`
+	// 1) Базовый запрос с джойном на users, чтобы подтянуть имя и телефон
+	query := `
+        SELECT
+            a.id,
+            a.user_id,
+            u.telegram_id,
+            u.name,            -- имя пользователя
+            u.phone,           -- телефон пользователя
+            a.title,
+            a.description,
+            a.price,
+            a.photos_urls,
+            a.address,
+            a.archived,
+            a.created_at,
+            a.updated_at
+        FROM advertisements a
+        JOIN users u ON a.user_id = u.id
+        WHERE a.archived = FALSE
+    `
 	args := []interface{}{}
 	i := 1
 
+	// 2) Добавляем фильтрацию по ключевому слову
 	if keyword != "" {
-		query += fmt.Sprintf(" AND title ILIKE $%d", i)
+		query += fmt.Sprintf(" AND a.title ILIKE $%d", i)
 		args = append(args, "%"+keyword+"%")
 		i++
 	}
+	// 3) И по максимальной цене
 	if maxPrice > 0 {
-		query += fmt.Sprintf(" AND price <= $%d", i)
+		query += fmt.Sprintf(" AND a.price <= $%d", i)
 		args = append(args, maxPrice)
+		i++
 	}
-	query += " ORDER BY created_at DESC"
 
+	query += " ORDER BY a.created_at DESC"
+
+	// 4) Выполняем запрос
 	rows, err := r.DB.Query(query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("search ads: %w", err)
 	}
 	defer rows.Close()
 
+	// 5) Сканируем результаты
 	var ads []*domain.Advertisement
 	for rows.Next() {
 		ad := &domain.Advertisement{}
-		if err := rows.Scan(&ad.ID, &ad.UserID, &ad.Title, &ad.Description, &ad.Price,
-			&ad.PhotosUrls, &ad.Address, &ad.Archived, &ad.CreatedAt, &ad.UpdatedAt); err != nil {
-			return nil, err
+		if err := rows.Scan(
+			&ad.ID,
+			&ad.UserID,
+			&ad.TelegramID,
+			&ad.UserName,  // <-- сюда
+			&ad.UserPhone, // <-- сюда
+			&ad.Title,
+			&ad.Description,
+			&ad.Price,
+			&ad.PhotosUrls,
+			&ad.Address,
+			&ad.Archived,
+			&ad.CreatedAt,
+			&ad.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan ad row: %w", err)
 		}
 		ads = append(ads, ad)
 	}
-	return ads, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ad rows: %w", err)
+	}
+	return ads, nil
 }
 
 func (r *AdRepo) Update(ad *domain.Advertisement) error {
